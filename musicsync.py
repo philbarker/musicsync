@@ -121,6 +121,9 @@ if __name__ == "__main__":
     parser.add_argument('-q', '--quick',type=str2bool, nargs='?',
                         const=True, default=False, metavar='True',
                         help='Do only a quick check for existing files')
+    parser.add_argument('-d', '--delete',type=str2bool, nargs='?',
+                        const=True, default=False, metavar='True',
+                        help='Delete music files on target if not in playlist')
     args = parser.parse_args()
 
     infile = args.infile
@@ -144,4 +147,4 @@ if __name__ == "__main__":
         print('\teven if it is different from source file.')
     print('INFO: source is %s,' % source)
     print('\tpath to source will be ignored when creating sub directories in target')
-    playlist.copyfiles(target, source, quick, 0, 10)
+    playlist.copyfiles(target, source, quick)
