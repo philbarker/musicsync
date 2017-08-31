@@ -6,11 +6,16 @@ from time import sleep
 
 class Playlist(list):
     def __init__(self, infile_name):
+        self.fn = infile_name
+        self.t = './Copiedfiles/'
+        self.s = ''
+        self.q = False
+        
         try:
-            print('INFO: reading playlist from %s.' % infile_name)
-            infile = open(infile_name)
+            print('INFO: reading playlist from %s.' % self.fn)
+            infile = open(self.fn)
         except:
-            msg = 'FATAL error: could not open '+ infile_name
+            msg = 'FATAL error: could not open '+ self.fn
             exit(msg)
         try:
             for line in infile.readlines():
@@ -59,23 +64,23 @@ class Playlist(list):
                     print('WARNING: could not copy %s \n\t to %s' % (ifn, ofn))
                     print(str(e))
 
-    def copyfiles(self, target, source, q, first=1, last=0):
+    def copyfiles(self, first=1, last=0):
         ofn = str('')         # output file name
         ifn = str('')         # input file name
-        discard = len(source)
+        discard = len(self.s)
         if (last < first):
             last = len(self)  # default to processing all of list
         try:
-            if os.path.isdir(target):
+            if os.path.isdir(self.t):
                 for ifn in self[first:last]:
-                    if ifn.startswith(source):
-                        ofn = target + ifn[discard:] # strips source directory
-                        self._copyfile(ifn, ofn, q)
+                    if ifn.startswith(self.s):
+                        ofn = self.t + ifn[discard:] # strips source directory
+                        self._copyfile(ifn, ofn, self.q)
                     else:
                         print('INFO: file is not in source directory.')
                         print('INFO: skipping file %s.' % ifn)
             else:
-                msg = 'FATAL ERROR: Target directory does not exist %s' % target
+                msg = 'FATAL ERROR: Target directory does not exist %s' % self.t
                 raise IOError(msg)
         except IOError as err:
             print(str(err))
@@ -91,14 +96,13 @@ class Playlist(list):
                     yield a
                 else:
                     return
-
         for i in range(len(self)):
             common_start = ''.join(_iter(self[i], common_start))
-        return common_start
+        self.s = common_start
         
 
 def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1', 'quick'):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
         return False
@@ -124,27 +128,34 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--delete',type=str2bool, nargs='?',
                         const=True, default=False, metavar='True',
                         help='Delete music files on target if not in playlist')
+    parser.add_argument('-c', '--copy',type=str2bool, nargs='?',
+                        const=True, default=True, metavar='False',
+                        help='Copy files to target. Defualt is True')
+    
     args = parser.parse_args()
 
-    infile = args.infile
+    playlist = Playlist(args.infile)
     if args.target.endswith('/'):
-        target = args.target
+        playlist.t = args.target
     else:
-        target = args.target + '/'
-    print('INFO: target directory is %s' % target)
-    playlist = Playlist(infile)
+        playlist.target = args.target + '/'
+    print('INFO: target directory is %s' % playlist.t)
     if args.source:
         if args.source.endswith('/'):
-            source = args.source
+            playlist.s = args.source
         else:
-            source = args.source + '/'
+            playlist.s = args.source + '/'
     else:
-        source = playlist.guess_source()
-    quick = args.quick
-    if quick:
+        playlist.guess_source()
+    playlist.q = args.quick
+    if playlist.q:
         print('INFO: quick option selected')
         print('\tWill skip copying if file of name name exists on device')
         print('\teven if it is different from source file.')
-    print('INFO: source is %s,' % source)
+    print('INFO: source is %s,' % playlist.s)
     print('\tpath to source will be ignored when creating sub directories in target')
-    playlist.copyfiles(target, source, quick)
+    if args.copy:
+        playlist.copyfiles()
+    else:
+        print('INFO: not copying, -c option is', args.copy)
+    
