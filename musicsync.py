@@ -175,7 +175,7 @@ if __name__ == "__main__":
     if args.target.endswith('/'):
         playlist.t = args.target
     else:
-        playlist.target = args.target + '/'
+        playlist.t = args.target + '/'
     print('INFO: target directory is %s' % playlist.t)
     if args.source:
         if args.source.endswith('/'):
