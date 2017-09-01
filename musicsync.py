@@ -30,8 +30,7 @@ class Playlist(list):
             print('INFO: closing playlist file.')
             infile.close()
 
-    def _copyfile(self, ifn, ofn):
-        q = self.q
+    def _copyfile(self, ifn, ofn, file_list):
         if not os.path.exists(os.path.dirname(ofn)):
             try:
                 print('INFO: making destination folder',
@@ -40,20 +39,32 @@ class Playlist(list):
             except OSError as exc: # Guard against race condition
                 if exc.errno != errno.EEXIST:
                     raise
-        if os.path.exists(ofn):
-            if q: # skip if file exists with same name 
+        if self.q: 
+            if ofn in file_list:
                 print('INFO: file with name already exists %s' % ofn)
                 return
-            else:  # check file with same name, copy if source is diff & newer
-                if compare(ifn, ofn):
-                    # do nothing if output file already same as input
-                    print('INFO: file already exists %s' % ofn)
-                    return
-                elif (os.path.getmtime(ifn) < os.path.getmtime(ofn)):
-                    print('INFO: not copying over newer file.')
-                    print('INFO: %s is newer than %s' % (ofn, ifn))
-                else:
-                    pass
+            else:
+                try:
+                    print('INFO: Copying %s \n\t to %s' % (ifn, ofn))
+                    copy2(ifn, ofn)
+                except Exception as e:
+                    if e.errno == 95:
+                        # raised becaused permission cannot be set 
+                        pass
+                    else:
+                        print('WARNING: could not copy %s \n\t to %s' 
+                              % (ifn, ofn))
+                        print(str(e))
+        elif os.path.exists(ofn):
+            if compare(ifn, ofn):
+                # do nothing if output file already same as input
+                print('INFO: file already exists %s' % ofn)
+                return
+            elif (os.path.getmtime(ifn) < os.path.getmtime(ofn)):
+                print('INFO: not copying over newer file.')
+                print('INFO: %s is newer than %s' % (ofn, ifn))
+            else:
+                pass
         else:
             try:
                 print('INFO: Copying %s \n\t to %s' % (ifn, ofn))
@@ -66,17 +77,24 @@ class Playlist(list):
                     print(str(e))
 
     def copyfiles(self, first=1, last=0):
+        file_list = []        # list of all files in target
         ofn = str('')         # output file name
         ifn = str('')         # input file name
         discard = len(self.s)
+        q = self.q
         if (last < first):
-            last = len(self)  # default to processing all of list
+            last = len(self)  # default to processing all of list          
         try:
             if os.path.isdir(self.t):
+                if q:
+                    print('INFO: creating list of files in target.')
+                    print('\tThis may take a while.')
+                    for filename in glob.iglob(self.t+'**/*', recursive=True):
+                        file_list.append(filename)
                 for ifn in self[first:last]:
                     if ifn.startswith(self.s):
                         ofn = self.t + ifn[discard:] # strips source directory
-                        self._copyfile(ifn, ofn)
+                        self._copyfile(ifn, ofn, file_list)
                     else:
                         print('INFO: file is not in source directory.')
                         print('INFO: skipping file %s.' % ifn)
@@ -107,6 +125,8 @@ class Playlist(list):
         pruning_list = []
         discard = len(self.t)
         delete = False
+        print('INFO: creating list of files in target.')
+        print('\tThis may take a while.')
         for filename in glob.iglob(self.t+'**/*.ogg', recursive=True):
             file_list.append(filename)
         for filename in glob.iglob(self.t+'**/*.mp3', recursive=True):
@@ -116,6 +136,7 @@ class Playlist(list):
             for sfn in self:
                 if sfn.endswith(rel_fn):
                     delete = False
+                    print('INFO: keeping', fn)
                     break
                 else:   # flag for deletion if rel_fn is not in playlist
                     delete = True
