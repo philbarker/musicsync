@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, os, argparse
+import sys, os, argparse, glob
 from shutil import copy2
 from filecmp import cmp as compare
 from time import sleep
@@ -30,7 +30,8 @@ class Playlist(list):
             print('INFO: closing playlist file.')
             infile.close()
 
-    def _copyfile(self, ifn, ofn, q):
+    def _copyfile(self, ifn, ofn):
+        q = self.q
         if not os.path.exists(os.path.dirname(ofn)):
             try:
                 print('INFO: making destination folder',
@@ -75,7 +76,7 @@ class Playlist(list):
                 for ifn in self[first:last]:
                     if ifn.startswith(self.s):
                         ofn = self.t + ifn[discard:] # strips source directory
-                        self._copyfile(ifn, ofn, self.q)
+                        self._copyfile(ifn, ofn)
                     else:
                         print('INFO: file is not in source directory.')
                         print('INFO: skipping file %s.' % ifn)
@@ -99,6 +100,42 @@ class Playlist(list):
         for i in range(len(self)):
             common_start = ''.join(_iter(self[i], common_start))
         self.s = common_start
+
+    def deletefiles(self):
+        print('INFO: deleting music files from target that are not in playlist')
+        file_list = []
+        pruning_list = []
+        discard = len(self.t)
+        delete = False
+        for filename in glob.iglob(self.t+'**/*.ogg', recursive=True):
+            file_list.append(filename)
+        for filename in glob.iglob(self.t+'**/*.mp3', recursive=True):
+            file_list.append(filename)
+        for fn in file_list:
+            rel_fn = fn[discard:]  # filename relative to target directory
+            for sfn in self:
+                if sfn.endswith(rel_fn):
+                    delete = False
+                    break
+                else:   # flag for deletion if rel_fn is not in playlist
+                    delete = True
+            if delete:
+                print('INFO: deleting', fn)
+                try:
+                    os.remove(fn)
+                    # maintain a list of directories that might now be empty
+                    path=fn.split('/')
+                    d='/'.join(path[:len(path)-1])
+                    if d not in pruning_list:
+                        pruning_list.append(d)
+                except:
+                    raise
+                delete = False # be good, if you can't be good be careful
+        for d in pruning_list: #delete the directories that have been emptied
+            if not os.listdir(d):
+                os.removedirs(d)
+                print('INFO: removing empty directory', d)
+            
         
 
 def str2bool(v):
@@ -158,4 +195,8 @@ if __name__ == "__main__":
         playlist.copyfiles()
     else:
         print('INFO: not copying, -c option is', args.copy)
+    if args.delete:
+        playlist.deletefiles()
+    else:
+        print('INFO: not deleting, -d option is', args.delete)
     
