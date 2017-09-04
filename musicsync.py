@@ -5,7 +5,28 @@ from filecmp import cmp as compare
 from time import sleep
 
 class Playlist(list):
-    def __init__(self, infile_name):
+    """A list of files for syncing with a target location.
+
+    Subclass of list which is used for a list of source file locations to be
+    synced with some target location.
+    Properties are options specified at the command line:
+    fn -- the filename of a m3u playlist used to populate the playlist.
+    t  -- the target directory to which files are copied
+    s  -- the source directory, to be ignored in paths on the target
+    q  -- a flag for whether a quicker method should be used to detect if a
+    file already exists in the target directory.
+    Methods:
+    copyfiles -- copies the contents of the source files to a target directory.
+    deletefiles -- deletes any music files in the target directory that are not
+    in the file list.
+    guess_source -- makes a guess at the source directory.
+    """
+    def __init__(self, infile_name: str):
+        """Parses an m3u playlist to create a list of file locations.
+
+        keyword argument:
+        infile_name -- path to an m3u file.
+        """
         self.fn = infile_name
         self.t = './Copiedfiles/'
         self.s = ''
@@ -31,6 +52,9 @@ class Playlist(list):
             infile.close()
 
     def _copyfile(self, ifn, ofn, file_list):
+        """copies a file from ifn to ofn after checking that it does not
+        already exist.
+        """
         if not os.path.exists(os.path.dirname(ofn)):
             try:
                 print('INFO: making destination folder',
@@ -39,7 +63,7 @@ class Playlist(list):
             except OSError as exc: # Guard against race condition
                 if exc.errno != errno.EEXIST:
                     raise
-        if self.q: 
+        if self.q: # quick mode, check only if file is in target file list
             if ofn in file_list:
                 print('INFO: file with name already exists %s' % ofn)
                 return
@@ -77,6 +101,22 @@ class Playlist(list):
                     print(str(e))
 
     def copyfiles(self, first=1, last=0):
+        """Copies files in file list to target.
+
+        Copies files in files list to target. The s [source] property is
+        used to specify a part of the path to the source files which is not
+        to be duplicataed on the target (can be used to avoid reproducing
+        path to music library under target directory).
+        If the q [quick] property is True then a list will be made of all
+        files already in the target which will be checked before copying so
+        no file will be copied if it is already in this list. If q is False,
+        a check will be made on whether the file exists in the target and
+        whether it is newer than that on the source before copying.
+        keyword parameters:
+        first -- the index of the first file in the list to copy.
+        last  -- the index of the last file in the list to copy.
+        if first > last then all files are copied. By default first=1 last=0
+        """
         file_list = []        # list of all files in target
         ofn = str('')         # output file name
         ifn = str('')         # input file name
@@ -108,6 +148,13 @@ class Playlist(list):
         return
 
     def guess_source(self):
+        """Makes a guess at a value for the s [source] property.
+
+        The longest common string at the start of the paths in the file list
+        is used as the s [source] property. This part of the path is not
+        reproduced under the t [target] directory. Can go wrong if all files
+        are from single folder deeper in source library than its root.
+        """
         common_start = self[0]
         def _iter(s1, s2):
             for a, b, in zip(s1, s2):
@@ -120,6 +167,12 @@ class Playlist(list):
         self.s = common_start
 
     def deletefiles(self):
+        """Deletes files that are in the target directory but not the playlist
+
+        Makes a list of all files in the t [target] directory and compares
+        them to the source file list, deletes those from t that are not in
+        the source file list.
+        """
         print('INFO: deleting music files from target that are not in playlist')
         file_list = []
         pruning_list = []
@@ -159,7 +212,7 @@ class Playlist(list):
             
         
 
-def str2bool(v):
+def _str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
@@ -172,7 +225,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='musicsync.py',
                 description='sync music from library to device using an m3u playlist')
     parser.add_argument('-if', '--infile', type=str, default='playlist.m3u',
-                        metavar='<file name>',
+                        metavar='<file path>',
                         help='input file, an m3u playlist, defaults to playlist.m3u')
     parser.add_argument('-t', '--target', type=str, default='./Copiedfiles/',
                         metavar='<directory path>',
@@ -180,13 +233,13 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--source', type=str, 
                         metavar='<directory path>',
                         help='source directory, a good default is guessed')
-    parser.add_argument('-q', '--quick',type=str2bool, nargs='?',
+    parser.add_argument('-q', '--quick',type=_str2bool, nargs='?',
                         const=True, default=False, metavar='True',
                         help='Do only a quick check for existing files')
-    parser.add_argument('-d', '--delete',type=str2bool, nargs='?',
+    parser.add_argument('-d', '--delete',type=_str2bool, nargs='?',
                         const=True, default=False, metavar='True',
                         help='Delete music files on target if not in playlist')
-    parser.add_argument('-c', '--copy',type=str2bool, nargs='?',
+    parser.add_argument('-c', '--copy',type=_str2bool, nargs='?',
                         const=True, default=True, metavar='False',
                         help='Copy files to target. Defualt is True')
     
@@ -208,7 +261,7 @@ if __name__ == "__main__":
     playlist.q = args.quick
     if playlist.q:
         print('INFO: quick option selected')
-        print('\tWill skip copying if file of name name exists on device')
+        print('\tWill skip copying if file of same name exists on device')
         print('\teven if it is different from source file.')
     print('INFO: source is %s,' % playlist.s)
     print('\tpath to source will be ignored when creating sub directories in target')
