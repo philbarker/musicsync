@@ -31,7 +31,8 @@ class Playlist(list):
         self.t = './Copiedfiles/'
         self.s = ''
         self.q = False
-        
+        self.dirs = []
+
         try:
             print('INFO: reading playlist from %s.' % self.fn)
             infile = open(self.fn)
@@ -42,11 +43,14 @@ class Playlist(list):
             for line in infile.readlines():
                 if not line.startswith('#'):
                     self.append(line.rstrip())
+                    d = '/'.join(line.split('/')[:-1])+'/'
+                    if d not in self.dirs:
+                        self.dirs.append(d)
         except SystemExit as err:
             exit(str(err))
         except:
             msg = 'FATAL ERROR: could not read playlist file.'
-            exit(msg)   
+            exit(msg)
         finally:
             print('INFO: closing playlist file.')
             infile.close()
@@ -73,10 +77,10 @@ class Playlist(list):
                     copy2(ifn, ofn)
                 except Exception as e:
                     if e.errno == 95:
-                        # raised becaused permission cannot be set 
+                        # raised becaused permission cannot be set
                         pass
                     else:
-                        print('WARNING: could not copy %s \n\t to %s' 
+                        print('WARNING: could not copy %s \n\t to %s'
                               % (ifn, ofn))
                         print(str(e))
         elif os.path.exists(ofn):
@@ -94,7 +98,7 @@ class Playlist(list):
                 print('INFO: Copying %s \n\t to %s' % (ifn, ofn))
                 copy2(ifn, ofn)
             except Exception as e:
-                if e.errno == 95: # raised becaused permission cannot be set 
+                if e.errno == 95: # raised becaused permission cannot be set
                     pass
                 else:
                     print('WARNING: could not copy %s \n\t to %s' % (ifn, ofn))
@@ -123,7 +127,7 @@ class Playlist(list):
         discard = len(self.s)
         q = self.q
         if (last < first):
-            last = len(self)  # default to processing all of list          
+            last = len(self)  # default to processing all of list
         try:
             if os.path.isdir(self.t):
                 if q:
@@ -209,8 +213,57 @@ class Playlist(list):
             if not os.listdir(d):
                 os.removedirs(d)
                 print('INFO: removing empty directory', d)
-            
-        
+
+    def copyart(self, first=1, last=0):
+        """Copies album art in dirs list to target.
+
+        Copies album art in dirs list to target. The s [source] property is
+        used to specify a part of the path to the source files which is not
+        to be duplicataed on the target (can be used to avoid reproducing
+        path to music library under target directory).
+        If the q [quick] property is True then a list will be made of all
+        files already in the target which will be checked before copying so
+        no file will be copied if it is already in this list. If q is False,
+        a check will be made on whether the file exists in the target and
+        whether it is newer than that on the source before copying.
+        keyword parameters:
+        first -- the index of the first file in the list to copy.
+        last  -- the index of the last file in the list to copy.
+        if first > last then all files are copied. By default first=1 last=0
+        """
+        file_list = []        # list of all files in target
+        ofn = str('')         # output file name
+        ifn = str('')         # input file name
+        discard = len(self.s)
+        q = self.q
+        if (last < first):
+            last = len(self)  # default to processing all of list
+        try:
+            if os.path.isdir(self.t):
+                print('INFO: creating list of art files in target.')
+                print('\tThis may take a while.')
+                for filename in glob.iglob(self.t+'**/*.jpg', recursive=True):
+                    file_list.append(filename)
+                for d in self.dirs:
+                    if os.path.exists(d+'album.jpg'):
+                        ifn = d+'album.jpg'
+                    else: 
+                        print('WARN: no art file in source directory.')
+                    if ifn.startswith(self.s):
+                        ofn = self.t + ifn[discard:] # strips source directory
+                        self._copyfile(ifn, ofn, file_list)
+                    else:
+                        print('WARN: art file is not in source directory.')
+                        print('INFO: skipping file %s.' % ifn)
+            else:
+                msg = 'FATAL ERROR: Target directory does not exist %s' % self.t
+                raise IOError(msg)
+        except IOError as err:
+            print(str(err))
+        finally:
+            pass
+        return
+
 
 def _str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -220,7 +273,7 @@ def _str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='musicsync.py',
                 description='sync music from library to device using an m3u playlist')
@@ -230,7 +283,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--target', type=str, default='./Copiedfiles/',
                         metavar='<directory path>',
                         help='target, path to a directory defaults to ./Copiedfiles/')
-    parser.add_argument('-s', '--source', type=str, 
+    parser.add_argument('-s', '--source', type=str,
                         metavar='<directory path>',
                         help='source directory, a good default is guessed')
     parser.add_argument('-q', '--quick',type=_str2bool, nargs='?',
@@ -242,7 +295,10 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--copy',type=_str2bool, nargs='?',
                         const=True, default=True, metavar='False',
                         help='Copy files to target. Defualt is True')
-    
+    parser.add_argument('-a', '--art',type=_str2bool, nargs='?',
+                        const=True, default=True, metavar='False',
+                        help='Copy album art to target. Defualt is True')
+
     args = parser.parse_args()
 
     playlist = Playlist(args.infile)
@@ -273,4 +329,7 @@ if __name__ == "__main__":
         playlist.deletefiles()
     else:
         print('INFO: not deleting, -d option is', args.delete)
-    
+    if args.art:
+        playlist.copyart()
+    else:
+        print("not copying art work, -a option is", args.art)
