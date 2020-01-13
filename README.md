@@ -36,7 +36,7 @@ playlist. This will be removed from path for the files within the target
 directory. Depending on how you have files organised in the library and on your
 device, this does not work well if all the files being copied are from the same 
 subdriectory in the library. For example if you want your files organsied in 
-subdirectories according to <path>/<to>/<library>/<artist>/<album>/songname.ext,
+subdirectories according to `<path>/<to>/<library>/<artist>/<album>/songname.ext`,
 when copying just a single album, the artist and album folders will be removed 
 as part of the common source. To avoid this supply the path to the library as
 the source option.
